@@ -50,20 +50,27 @@ This installer includes:
 - README + License  
 
 ---
+---
 
 ## 📸 Screenshots
 
-### Main UI
+### 🔷 Splash Screen
 <p align="center">
-  <img src="https://github.com/USER/REPO/raw/main/screenshots/ui_main.png" width="700">
+  <img src="screenshots/splash.png" width="700" alt="SHOCKWVE Splash Screen">
 </p>
 
-### 3D Nozzle Wireframe
+### 🔷 Main Interface
 <p align="center">
-  <img src="https://github.com/USER/REPO/raw/main/screenshots/ui_3d.png" width="700">
+  <img src="SHOCKINTERFACE.png" width="700" alt="SHOCKWVE Main UI">
+</p>
+
+### 🔷 3D Nozzle Visualization
+<p align="center">
+  <img src="SHOCKSCREEN.png" width="700" alt="SHOCKWVE 3D Wireframe">
 </p>
 
 ---
+
 
 ## 🧪 Inputs & Model Assumptions
 
