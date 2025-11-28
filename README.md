@@ -54,11 +54,6 @@ This installer includes:
 
 ## 📸 Screenshots
 
-### 🔷 Splash Screen
-<p align="center">
-  <img src="screenshots/splash.png" width="700" alt="SHOCKWVE Splash Screen">
-</p>
-
 ### 🔷 Main Interface
 <p align="center">
   <img src="SHOCKINTERFACE.png" width="700" alt="SHOCKWVE Main UI">
