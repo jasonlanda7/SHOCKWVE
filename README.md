@@ -36,7 +36,7 @@ This tool is intended for **educational + preliminary design** using ideal compr
 - 📉 **Under / Perfect / Over-expanded thrust output**  
 - 🌀 **3D nozzle wireframe generator**  
 - 🟦 **Full installer with shortcuts + license + README**  
-- 💾 **Exports 2D contour to Excel (.xlsx)**  
+- 💾 **Exports 2D contour points to Excel ready for simulation(.xlsx)**  
 
 ---
 
