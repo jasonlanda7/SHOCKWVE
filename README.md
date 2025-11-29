@@ -88,7 +88,7 @@ This installer includes:
 ---
 
 ## ⚠️ Limitations
-> SHOCKWVE is **not** a CFD tool.  
+> SHOCKWVE is **not** a tool ment for final design decisions but serves as a preliminary tool for CFD simulations.  
 > It is based on ideal compressible-flow theory and should not be used for mission-critical hardware decisions.
 
 ---
