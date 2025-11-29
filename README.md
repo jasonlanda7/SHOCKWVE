@@ -41,7 +41,7 @@ This tool is intended for **educational + preliminary design** using ideal compr
 ---
 
 ## 📥 Download
-### ⬇️ **[Download SHOCKWVE Installer (Latest Release)](../../releases/latest/download/SHOCKWVE_Installer.exe)**
+### ⬇️ **[Download SHOCKWVE Installer (Latest Release)](../../releases/tag/v1.0.0)**
 
 This installer includes:
 - SHOCKWVE.exe  
