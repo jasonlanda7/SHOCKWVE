@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>isentropic nozzle generator & 3D visualizer</strong><br>
-  <strong>Version 1.0 — © 2025 Jason Da Silva</strong>
+  <strong>Version 2.0 — © 2026 Jason Da Silva</strong>
 </p>
 
 ---
@@ -83,7 +83,8 @@ This installer includes:
 - **γ constant** through the entire nozzle  
 - **Choked throat** → mass flow fixed  
 - No viscous losses, no shocks  
-- Off-design operation alters thrust automatically  
+- Off-design operation alters thrust automatically
+- Option between MOC and Rao Bell nozzle approximation
 
 ---
 
