@@ -1,4 +1,4 @@
-![version](https://img.shields.io/badge/version-1.0-cyan?style=for-the-badge)
+![version](https://img.shields.io/badge/version-2.0-cyan?style=for-the-badge)
 ![status](https://img.shields.io/badge/status-active-magenta?style=for-the-badge)
 ![license](https://img.shields.io/badge/license-proprietary-orange?style=for-the-badge)
 
@@ -21,8 +21,7 @@
 - Rao throat blending  
 - Full MOC bell nozzle contours  
 - 2D plots + 3D wireframe revolutions  
-- Thrust predictions for perfect, under, or over-expanded conditions  
-- ASCII cyber-splash intro  
+- Thrust predictions for perfect, under, or over-expanded conditions    
 - Professional Windows installer included  
 
 This tool is intended for **educational + preliminary design** using ideal compressible-flow assumptions.
@@ -30,7 +29,6 @@ This tool is intended for **educational + preliminary design** using ideal compr
 ---
 
 ## 🔥 Features
-- ⚡ **Neon cyber UI**  
 - ⚙️ **Isentropic flow model (γ constant)**  
 - 🚀 **Automatic throat sizing from thrust**  
 - 📉 **Under / Perfect / Over-expanded thrust output**  
