@@ -1535,7 +1535,7 @@ class ShockWveApp(QMainWindow):
 
     def load_main_ui(self):
         self.stack.setCurrentWidget(self.main_page)
-        self.resize(780, 700)
+        self.resize(835, 800)
         self.center_on_screen(y_offset=20)  # higher than splash
 
         #self.stack.setCurrentWidget(self.main_page)
