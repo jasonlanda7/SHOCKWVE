@@ -194,7 +194,9 @@ def rao_bell_nozzle(
     P0, T0, gamma, Pa, Pe, R, F,
     use_cea=False, Cf=None, eps_user=None,
     CR=None, Lstar_m=None,
-    include_chamber=False,          # 🔥 ADD
+    include_chamber=False,
+    use_conical=False,
+    conical_half_angle_deg=15.0,
     bell_percent=1.0, N=1500
 ):
     # ===== HARD INPUT GUARDS =====
@@ -307,32 +309,102 @@ def rao_bell_nozzle(
         1.0:[10,9,8,6,5.25,4.9,4.75,4.5,4.25]
     }
 
-    # ===== Length (CRITICAL) =====
-    f1 = ((math.sqrt(eps)-1)*Rt)/math.tan(math.radians(15))
-    LN = bell_percent * f1
+    # ============================================================
+    # DIVERGENT GEOMETRY: RAO BELL OR CONICAL
+    # ============================================================
 
-    # ===== Log-log interpolation =====
-    thn = np.deg2rad(np.interp(np.log10(eps), np.log10(ar), theta_n[bell_percent]))
-    the = np.deg2rad(np.interp(np.log10(eps), np.log10(ar), theta_e[bell_percent]))
+    conical_angle = math.radians(conical_half_angle_deg)
+
+    # Rao-table angles are still used for the throat transition
+    thn = np.deg2rad(
+        np.interp(
+            np.log10(eps),
+            np.log10(ar),
+            theta_n[bell_percent]
+        )
+    )
+
+    the = np.deg2rad(
+        np.interp(
+            np.log10(eps),
+            np.log10(ar),
+            theta_e[bell_percent]
+        )
+    )
 
     # ===== Throat arc =====
-    th2 = np.linspace(-math.pi/2, thn-math.pi/2, 50)
-    x2 = 0.382*Rt*np.cos(th2)
-    y2 = 0.382*Rt*np.sin(th2) + 0.382*Rt + Rt
+    if use_conical:
+        # Make the throat arc leave at the conical half-angle
+        throat_exit_angle = conical_angle
+    else:
+        throat_exit_angle = thn
+
+    th2 = np.linspace(
+        -math.pi / 2.0,
+        throat_exit_angle - math.pi / 2.0,
+        50
+    )
+
+    x2 = 0.382 * Rt * np.cos(th2)
+    y2 = (
+            0.382 * Rt * np.sin(th2)
+            + 0.382 * Rt
+            + Rt
+    )
 
     Nx, Ny = x2[-1], y2[-1]
 
-    # ===== Bezier =====
-    m1, m2 = math.tan(thn), math.tan(the)
-    C1 = Ny - m1*Nx
-    C2 = Re - m2*LN
+    if use_conical:
+        # Straight conical divergent from the end of the throat arc
+        radial_change = Re - Ny
 
-    Qx = (C2-C1)/(m1-m2)
-    Qy = (m1*C2 - m2*C1)/(m1-m2)
+        if radial_change <= 0.0:
+            raise ValueError(
+                "Exit radius must be greater than the throat-arc radius."
+            )
 
-    t = np.linspace(0,1,300)
-    xb = (1-t)**2*Nx + 2*(1-t)*t*Qx + t**2*LN
-    yb = (1-t)**2*Ny + 2*(1-t)*t*Qy + t**2*Re
+        L_conical = radial_change / math.tan(conical_angle)
+        LN = Nx + L_conical
+
+        xb = np.linspace(Nx, LN, 300)
+        yb = Ny + (xb - Nx) * math.tan(conical_angle)
+
+        # Force the final point to match the requested exit radius exactly
+        xb[-1] = LN
+        yb[-1] = Re
+
+    else:
+        # Standard Rao-bell length
+        f1 = (
+                (math.sqrt(eps) - 1.0) * Rt
+                / math.tan(math.radians(15.0))
+        )
+
+        LN = bell_percent * f1
+
+        # Quadratic Rao-bell Bezier
+        m1 = math.tan(thn)
+        m2 = math.tan(the)
+
+        C1 = Ny - m1 * Nx
+        C2 = Re - m2 * LN
+
+        Qx = (C2 - C1) / (m1 - m2)
+        Qy = (m1 * C2 - m2 * C1) / (m1 - m2)
+
+        t = np.linspace(0.0, 1.0, 300)
+
+        xb = (
+                (1.0 - t) ** 2 * Nx
+                + 2.0 * (1.0 - t) * t * Qx
+                + t ** 2 * LN
+        )
+
+        yb = (
+                (1.0 - t) ** 2 * Ny
+                + 2.0 * (1.0 - t) * t * Qy
+                + t ** 2 * Re
+        )
 
     # ===== Convergent =====
     # ============================================================
@@ -489,13 +561,11 @@ def rao_bell_nozzle(
         * (1.0 - (Pe / P0) ** ((gamma - 1.0) / gamma))
     )
 
-    phi = math.sqrt(gamma / R) * (
-            ((gamma + 1.0) / 2.0) ** (-(gamma + 1.0) / (2.0 * (gamma - 1.0)))
-    )
-
-    mdot = P0 / math.sqrt(T0) * phi * At
+    mdot = (F - (Pe - Pa) * Ae) / Ve
 
     F_actual = mdot * Ve + (Pe - Pa) * Ae
+
+
 
 
     result = {
@@ -518,6 +588,10 @@ def rao_bell_nozzle(
 
     # length
     "LN_m": LN,
+
+
+    "use_conical": use_conical,
+    "conical_half_angle_deg": conical_half_angle_deg,
 
     # performance
     "Ve": Ve,
@@ -912,12 +986,11 @@ class GlassPanel(QWidget):
         super().__init__()
         self.setStyleSheet("""
             QWidget {
-                background-color: rgba(10,10,10,230);
+                background-color: black;
                 border: 1px solid #00f5ff;
                 border-radius: 14px;
             }
         """)
-
 
 
 
@@ -1281,27 +1354,102 @@ class ShockWveApp(QMainWindow):
             }
         """)
 
+        self.tabs = QTabWidget()
+
         self.tabs.setStyleSheet("""
-        QTabBar::tab {
-            background:#111;
-            color:white;
-            padding:6px 16px;
-            border-radius:4px;
-        }
-        QTabWidget::pane {
-            border-top: 8px solid #111;
-        }
-        QTabBar::tab:selected {
-            background:#00f5ff;
-            color:black;
-        }
-    """)
+            QTabBar::tab {
+                background:#111;
+                color:white;
+                padding:6px 16px;
+                border-radius:4px;
+            }
+            QTabWidget::pane {
+                border-top: 8px solid #111;
+            }
+            QTabBar::tab:selected {
+                background:#00f5ff;
+                color:black;
+            }
+        """)
 
         self.canvas_2d = MplCanvas(is_3d=False)
         self.canvas_3d = MplCanvas(is_3d=True)
 
         t1 = QWidget()
-        QVBoxLayout(t1).addWidget(self.canvas_2d)
+        t1_layout = QVBoxLayout(t1)
+        t1_layout.setContentsMargins(6, 6, 6, 6)
+
+        t1.setStyleSheet("""
+        QWidget {
+            background-color: black;
+        }
+        """)
+
+
+        # Controls located inside the 2D contour tab
+        contour_controls = QHBoxLayout()
+        contour_controls.setContentsMargins(6, 4, 6, 2)
+        contour_controls.setAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self.show_vertical_lines_cb = QCheckBox("Show Vertical Lines")
+        self.show_vertical_lines_cb.setChecked(True)
+        self.show_vertical_lines_cb.setStyleSheet("""
+            QCheckBox {
+                color: #00f5ff;
+                font-family: Consolas;
+                spacing: 6px;
+            }
+
+            QCheckBox::indicator {
+                width: 14px;
+                height: 14px;
+            }
+        """)
+        self.show_vertical_lines_cb.stateChanged.connect(self.update_2d_plot)
+
+        contour_controls.addWidget(self.show_vertical_lines_cb)
+
+        # Red conical-nozzle toggle
+        self.conical_nozzle_cb = QCheckBox("Conical Nozzle")
+        self.conical_nozzle_cb.setChecked(False)
+        self.conical_nozzle_cb.setEnabled(False)
+
+        self.conical_nozzle_cb.setStyleSheet("""
+            QCheckBox {
+                background-color: transparent;
+                color: #ff3030;
+                font-family: Consolas;
+                spacing: 6px;
+            }
+
+            QCheckBox::indicator {
+                width: 14px;
+                height: 14px;
+            }
+
+            QCheckBox::indicator:checked {
+                background-color: #ff3030;
+                border: 1px solid #ff3030;
+            }
+
+            QCheckBox::indicator:unchecked {
+                background-color: black;
+                border: 1px solid #ff3030;
+            }
+
+            QCheckBox:disabled {
+                color: #662020;
+            }
+        """)
+
+        self.conical_nozzle_cb.stateChanged.connect(self.on_conical_nozzle_changed)
+
+        contour_controls.addSpacing(15)
+        contour_controls.addWidget(self.conical_nozzle_cb)
+        contour_controls.addStretch()
+
+        t1_layout.addLayout(contour_controls)
+        t1_layout.addWidget(self.canvas_2d)
 
         t2 = QWidget()
         QVBoxLayout(t2).addWidget(self.canvas_3d)
@@ -1689,7 +1837,9 @@ class ShockWveApp(QMainWindow):
                     eps_user=eps,
                     CR=CR,
                     Lstar_m=Lstar_m,
-                    include_chamber=self.show_chamber_cb.isChecked()  # 🔥 ADD
+                    include_chamber=self.show_chamber_cb.isChecked(),
+                    use_conical=self.conical_nozzle_cb.isChecked(),
+                    conical_half_angle_deg=15.0
                 )
 
                 self.last_result = res
@@ -1717,6 +1867,13 @@ class ShockWveApp(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Computation error", str(e))
 
+    def on_conical_nozzle_changed(self):
+        # The contour geometry must be recalculated
+        if hasattr(self, "last_result"):
+            self.run_computation()
+
+
+
     def update_2d_plot(self):
         if not hasattr(self, "last_result"):
             return
@@ -1732,10 +1889,12 @@ class ShockWveApp(QMainWindow):
         # Enable/disable Rao-only options
         self.cea_mode_cb.setEnabled(rao_on)
         self.show_chamber_cb.setEnabled(rao_on)
+        self.conical_nozzle_cb.setEnabled(rao_on)
 
         if not rao_on:
             self.cea_mode_cb.setChecked(False)
             self.show_chamber_cb.setChecked(False)
+            self.conical_nozzle_cb.setChecked(False)
 
         # Clear previous results
         if hasattr(self, "last_result"):
@@ -1816,6 +1975,22 @@ class ShockWveApp(QMainWindow):
 
         lines = []
         lines.append("<span style='color:#00ff00; font-weight:bold;'>Rao Bell Nozzle Parameters</span>")
+
+        if res.get("use_conical", False):
+            lines.append(
+                "<span style='color:#ff3030; font-weight:bold;'>"
+                "Divergent Type: CONICAL</span>"
+            )
+            lines.append(
+                f"Conical Half Angle:           "
+                f"{res['conical_half_angle_deg']:.1f} degrees"
+            )
+        else:
+            lines.append(
+                "<span style='color:#00f5ff; font-weight:bold;'>"
+                "Divergent Type: RAO BELL</span>"
+            )
+
         lines.append(f"Exit Mach number (Me):        {res['Me']:.3f}")
         lines.append(f"Expansion Ratio (Ae/At):      {res['eps']:.3f}")
         lines.append(f"Exhaust Velocity (Ve):        {res['Ve']:.2f} m/s")
@@ -1854,6 +2029,126 @@ class ShockWveApp(QMainWindow):
         lines.append(msg)
 
         self.output_text.setHtml("<br>".join(lines))
+
+    def draw_nozzle_section_markers(
+            self,
+            ax,
+            markers,
+            contour_x,
+            contour_r,
+            solid_start=None,
+            solid_exit=None,
+            show_labels=True
+    ):
+        """
+        Draw vertical guide lines on the 2D contour.
+        Lines are clipped to the nozzle wall height at each x-location:
+        - Dashed white lines mark internal section boundaries.
+        - Solid white lines mark chamber/start and nozzle exit.
+        """
+        dashed_label_used = False
+        solid_start_used = False
+        solid_exit_used = False
+
+        contour_x = np.asarray(contour_x, dtype=float)
+        contour_r = np.abs(np.asarray(contour_r, dtype=float))
+
+        valid = np.isfinite(contour_x) & np.isfinite(contour_r)
+        contour_x = contour_x[valid]
+        contour_r = contour_r[valid]
+
+        if contour_x.size == 0 or contour_r.size == 0:
+            return
+
+        order = np.argsort(contour_x)
+        contour_x = contour_x[order]
+        contour_r = contour_r[order]
+
+        contour_x, unique_idx = np.unique(contour_x, return_index=True)
+        contour_r = contour_r[unique_idx]
+
+        def clean_x(value):
+            try:
+                if value is None:
+                    return None
+                value = float(value)
+                if not np.isfinite(value):
+                    return None
+                return value
+            except Exception:
+                return None
+
+        def already_used(x_value, used, tol=1e-6):
+            return any(abs(x_value - old) <= tol for old in used)
+
+        def wall_height_at(x_value):
+            if x_value < contour_x[0] or x_value > contour_x[-1]:
+                return None
+            height = float(np.interp(x_value, contour_x, contour_r))
+            if not np.isfinite(height) or height <= 0:
+                return None
+            return height
+
+        def draw_clipped_marker(x_value, linestyle, linewidth, alpha, label):
+            height = wall_height_at(x_value)
+            if height is None:
+                return False
+            ax.plot(
+                [x_value, x_value],
+                [-height, height],
+                color="white",
+                linestyle=linestyle,
+                linewidth=linewidth,
+                alpha=alpha,
+                label=label,
+                zorder=6
+            )
+            return True
+
+        used_x = []
+
+        for x_value in markers:
+            x_value = clean_x(x_value)
+            if x_value is None or already_used(x_value, used_x):
+                continue
+            used_x.append(x_value)
+            if draw_clipped_marker(
+                x_value,
+                linestyle="--",
+                linewidth=1.0,
+                alpha=0.75,
+                    label=(
+                            "Section Boundary"
+                            if show_labels and not dashed_label_used
+                            else "_nolegend_"
+                    )
+            ):
+                dashed_label_used = True
+
+        for x_value, label_kind in [(solid_start, "Chamber Start"), (solid_exit, "Nozzle Exit")]:
+            x_value = clean_x(x_value)
+            if x_value is None or already_used(x_value, used_x):
+                continue
+            used_x.append(x_value)
+
+            if label_kind == "Chamber Start":
+                show_label = not solid_start_used
+                solid_start_used = True
+            else:
+                show_label = not solid_exit_used
+                solid_exit_used = True
+
+            draw_clipped_marker(
+                x_value,
+                linestyle="-",
+                linewidth=1.6,
+                alpha=0.95,
+                label=(
+                    label_kind
+                    if show_labels and show_label
+                    else "_nolegend_"
+                )
+            )
 
     def plot_2d(self, res):
         ax = self.canvas_2d.ax
@@ -1940,6 +2235,24 @@ class ShockWveApp(QMainWindow):
         ax.plot(x_div, y_div, color="#00ffff", linewidth=2, label="MOC Divergent")
         ax.plot(x_div, -y_div, color="#00ffff", linewidth=1)
 
+        section_markers = [
+            x_conv[0],      # chamber/convergent start
+            x_conv[-1],     # throat station
+            x_conn[-1],     # connector -> divergent transition
+            x_div[0],       # MOC divergent start
+            x_div[-1],      # nozzle exit
+        ]
+        if self.show_vertical_lines_cb.isChecked():
+            self.draw_nozzle_section_markers(
+                ax,
+                markers=section_markers[1:-1],
+                contour_x=res["x_full"],
+                contour_r=res["r_full"],
+                solid_start=x_conv[0],
+                solid_exit=x_div[-1],
+                show_labels=self.show_legend_cb.isChecked()
+            )
+
         ax.plot([], [], color="#00f5ff", linewidth=1.2, label="C⁺ Characteristics")
         ax.plot([], [], color="#ff40c0", linewidth=1.2, label="C⁻ Characteristics")
 
@@ -1988,6 +2301,52 @@ class ShockWveApp(QMainWindow):
         ax.plot(res["x_throat"], res["r_throat"], color="#ff00ff", lw=2, label="Throat Arc")
         ax.plot(res["x_throat"], -res["r_throat"], color="#ff00ff", lw=1)
 
+        if res.get("use_conical", False):
+            divergent_color = "#ff3030"
+            divergent_label = "Conical Divergent"
+        else:
+            divergent_color = "#00FF00"
+            divergent_label = "Rao Bell Divergent"
+
+        ax.plot(
+            res["x_div"],
+            res["r_div"],
+            color=divergent_color,
+            lw=2.5,
+            label=divergent_label
+        )
+
+        ax.plot(
+            res["x_div"],
+            -res["r_div"],
+            color=divergent_color,
+            lw=1.5
+        )
+
+
+
+        rao_markers = []
+        if "x_chamber" in res and len(res["x_chamber"]) > 0:
+            rao_markers.append(res["x_chamber"][-1])  # chamber -> convergent
+        rao_markers.extend([
+            res["x_conv"][0],       # convergent start
+            res["x_conv"][-1],      # convergent -> throat
+            res["x_throat"][-1],    # throat arc -> bell
+        ])
+        if "x_div" in res and len(res["x_div"]) > 0:
+            rao_markers.append(res["x_div"][-1])     # nozzle exit reference
+
+        if self.show_vertical_lines_cb.isChecked():
+            self.draw_nozzle_section_markers(
+                ax,
+                markers=rao_markers[1:-1],
+                contour_x=x_full,
+                contour_r=r_full,
+                solid_start=x_full[0],
+                solid_exit=x_full[-1],
+                show_labels=self.show_legend_cb.isChecked()
+            )
+
         # 3) Proper zoom MUST be set before draw
         xmin = float(np.min(x_full))
         xmax = float(np.max(x_full))
@@ -2002,7 +2361,12 @@ class ShockWveApp(QMainWindow):
         ax.set_aspect("equal", adjustable="box")
         ax.set_xlabel("Axial Distance (mm)", color="white")
         ax.set_ylabel("Radius (mm)", color="white", labelpad=-1)
-        ax.set_title("Rao Bell Nozzle (2D)", color="white")
+        if res.get("use_conical", False):
+            plot_title = "Conical Nozzle (2D)"
+        else:
+            plot_title = "Rao Bell Nozzle (2D)"
+
+        ax.set_title(plot_title, color="white")
         ax.grid(True, color="#444")
 
         if self.show_legend_cb.isChecked():
